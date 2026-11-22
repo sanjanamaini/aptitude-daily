@@ -2,7 +2,7 @@
 """Tests for the aptitude engine: sandbox, number parsing, answer checks, answer parsing,
 the planner, a full build with a fake Claude, and the website API (on a throwaway home).
 
-  python3 scripts/aptitude/test_apt.py
+  python3 test_apt.py
 """
 import json
 import os

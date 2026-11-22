@@ -437,8 +437,8 @@ def cmd_sync(a):
     rows = [(d, store.paper(d), store.attempt(d)) for d in store.days()]
     st = score.rollup(rows, store.today(), window=28)
     lines = ["# Aptitude progress (XAT 2027 and BITS BAAT)", "",
-             "Built by `scripts/aptitude/apt.py sync` on %s from %s. Sets: %d, solved: %d, streak: %d day(s)." % (
-                 store.today(), store.state(), len(rows), st["solved_days"], st["streak"]), "",
+             "Built by `apt.py sync` on %s. Sets: %d, solved: %d, streak: %d day(s)." % (
+                 store.today(), len(rows), st["solved_days"], st["streak"]), "",
              "## Sections, last 28 days", ""]
     names = store.load_config()["sections"]
     for code, s in sorted(st["sections"].items()):

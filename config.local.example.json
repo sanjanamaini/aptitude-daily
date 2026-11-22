@@ -1,0 +1,8 @@
+{
+  "_about": "Copy to config.local.json (git-ignored) and edit. Anything here overrides config.json; nested objects merge key by key.",
+  "paths": {"home": "~/.aptitude-daily"},
+  "sync_dir": "~/Documents/aptitude-progress",
+  "launchd": {"label": "local.aptitude-daily", "web_label": "local.aptitude-daily.web"},
+  "schedule": "06:30",
+  "ramp": {"start": "2026-11-22"}
+}
