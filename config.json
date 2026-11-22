@@ -15,12 +15,15 @@
     "generate": "opus",
     "solve": "opus",
     "timeout_s": 900,
-    "parallel_calls": 4
+    "parallel_calls": 4,
+    "max_limit_wait_s": 21600,
+    "questions_per_call": 12
   },
   "verify": {
-    "topup_rounds": 2,
+    "topup_rounds": 3,
     "dedup_threshold": 0.6,
-    "group_dedup_threshold": 0.45
+    "group_dedup_threshold": 0.45,
+    "min_publish_fraction": 0.9
   },
   "scoring": {
     "correct": 1.0,
@@ -65,51 +68,39 @@
     {
       "name": "xat",
       "until": "2027-01-03",
-      "label": "XAT focus until 3 Jan 2027, BAAT alongside",
+      "label": "Mostly Quant, with XAT's other sections until 3 Jan 2027",
       "mix": {
         "QA": {
-          "n": 12
+          "n": 30
         },
         "DI": {
-          "n": 4,
-          "sets": [
-            4
-          ]
-        },
-        "RC": {
-          "n": 4,
-          "sets": [
-            4
-          ]
-        },
-        "VA": {
-          "n": 6
-        },
-        "LR": {
           "n": 6,
-          "sets": [
-            3
-          ]
-        },
-        "DM": {
-          "n": 10,
           "sets": [
             3,
             3
           ]
         },
-        "AA": {
-          "n": 8
+        "LR": {
+          "n": 4
+        },
+        "DM": {
+          "n": 5,
+          "sets": [
+            3
+          ]
+        },
+        "VA": {
+          "n": 5
         }
       }
     },
     {
       "name": "baat",
       "until": null,
-      "label": "BAAT focus",
+      "label": "Mostly Quant, with BAAT's other sections",
       "mix": {
         "QA": {
-          "n": 14
+          "n": 30
         },
         "DI": {
           "n": 6,
@@ -118,23 +109,11 @@
             3
           ]
         },
-        "RC": {
-          "n": 4,
-          "sets": [
-            4
-          ]
-        },
-        "VA": {
+        "LR": {
           "n": 6
         },
-        "LR": {
-          "n": 8,
-          "sets": [
-            4
-          ]
-        },
         "AA": {
-          "n": 12
+          "n": 8
         }
       }
     }

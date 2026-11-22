@@ -6,17 +6,17 @@ Claude writes the questions. Python code recomputes every answer that can be com
 
 ## A day's set
 
+Mostly Quant, every day:
+
 | Section | Questions | Exam |
 |---|---|---|
-| Verbal Ability (para jumbles, odd one out, critical reasoning, usage) | 6 | XAT, BAAT |
-| Reading Comprehension (one 380-480 word argumentative passage) | 4 | XAT, BAAT |
-| Decision Making (two cases of 3, plus 4 single questions) | 10 | XAT |
-| Quantitative Ability | 12 | XAT, BAAT |
-| Data Interpretation (one set: table, bar, line or pie chart, or caselet) | 4 | XAT, BAAT |
-| Logical Reasoning (one puzzle of 3, plus 3 single questions) | 6 | BAAT, XAT |
-| Analytics Aptitude (matrices, calculus, numerical methods, probability, programs, data structures, Boolean algebra) | 8 | BAAT |
+| Quantitative Ability (arithmetic, algebra, number system, geometry and mensuration, modern maths) | 30 | XAT, BAAT |
+| Data Interpretation (two sets of 3: table, bar, line or pie chart, or caselet) | 6 | XAT, BAAT |
+| Logical Reasoning (single questions: arrangements, syllogisms, series, data sufficiency and more) | 4 | BAAT, XAT |
+| Decision Making (one case of 3, plus 2 single questions) | 5 | XAT |
+| Verbal Ability (para jumbles, odd one out, critical reasoning, usage) | 5 | XAT, BAAT |
 
-That is the XAT-focused mix, used until 3 January 2027. After that the default switches to a BAAT-focused mix (more Quant, DI, Reasoning and Analytics Aptitude, no Decision Making). Both are in `config.json` under `phases`.
+That is the mix until 3 January 2027 (XAT). After that, Decision Making and Verbal Ability give way to BAAT's Analytics Aptitude (matrices, calculus, numerical methods, probability, programs, data structures, Boolean algebra): Quant 30, DI 6, Reasoning 6, Analytics Aptitude 8. Reading Comprehension passages are supported but not in the default mix. Both mixes are in `config.json` under `phases`; change the numbers there for a different balance.
 
 Sections and topics follow the published patterns: the [BITS BAAT syllabus](https://dom.bits-pilani.ac.in/admissions/baat-syllabus) (Management Aptitude and Analytics Aptitude) and the XAT pattern as reported for XAT 2027 (Verbal and Logical Ability, Decision Making, Quantitative Ability and DI; 5 options; minus 0.25 per wrong answer), both checked on 21 November 2026. XAT's General Knowledge part is left out on purpose: a language model's current-affairs knowledge goes stale.
 
@@ -31,7 +31,11 @@ Sections and topics follow the published patterns: the [BITS BAAT syllabus](http
 3. **Compute.** For anything computable (all Quant and DI, most puzzles, program output, Boolean algebra, stack and queue traces) the setter also writes Python that works the answer out from the givens. It runs in a sandbox: plain computation only, a short list of maths modules, no files, network, `eval` or double-underscore access, an isolated interpreter (`python -I`), a timeout and a CPU limit. The result must land on the keyed option, at the precision the options are printed in, and on no other option.
 4. **Not a repeat.** A question whose wording overlaps an earlier one by 60% or more, with the numbers ignored, is dropped, so a question with only its numbers changed counts as a repeat.
 5. **Blind solve.** A separate Claude call answers every surviving question without seeing the key. Any disagreement drops the question, and so does a flaw it reports with low confidence.
-6. **Top up.** Dropped questions are written again, up to two more rounds. If a section is still short, the day ships with fewer questions and the notification says so.
+6. **Top up.** Dropped questions are written again, up to three more rounds. A set is published only if at least 90% of it (45 of 50) passed; otherwise nothing is published and the next scheduled try builds it again.
+
+Big sections go to Claude in calls of about 12 questions, run in parallel. Questions on the same topic go in the same call so the setter can make them test different ideas, and a final check drops any question that repeats another one kept that day.
+
+**Usage limits.** If Claude reports that your plan's usage limit is reached, the build reads the reset time from the message, waits until just after it (up to 6 hours), and carries on where it stopped; the Health page shows the wait.
 
 The questions (`paper.json`) and the key (`key.json`) are separate files, and the website never sends the key for a day that is still locked.
 
@@ -98,7 +102,7 @@ The build runs at 06:30 local time, again at 09:30, 13:00 and 18:00 if the day's
 ## Tests
 
 ```
-python3 test_apt.py    # 28 tests: sandbox, number matching, planner and ramp, a full build with a fake Claude, the CLI, the website API
+python3 test_apt.py    # 31 tests: sandbox, number matching, planner and ramp, a full build with a fake Claude, the CLI, the website API
 python test_web.py     # 32 checks in a real browser on a throwaway copy of your state, with screenshots
 ```
 

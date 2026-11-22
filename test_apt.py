@@ -60,7 +60,8 @@ def fake_call(system, prompt, model, timeout, cwd):
         k = LET[s % nopt]
         opts = [str(x + 10 * (i - LET.index(k))) for i in range(nopt)]
         trap = " TRAP" if s == 2 else ""
-        stem = "Unique question number %d in %s with value %d%s k=%s alpha%d beta%d gamma%d" % (s, code, x, trap, k, s, s * 3, s * 5)
+        w = "".join(chr(97 + int(c)) for c in str(s))  # a word made from the slot number (numbers are ignored by the repeat check)
+        stem = "Question %s%s about %sx %sy %sz in %s with value %d%s k=%s" % (w, code.lower(), w, w, w, code, x, trap, k)
         out.append({"slot": s, "group": g, "topic": "t", "subtopic": "st", "difficulty": "medium", "stem": stem,
                     "options": opts, "answer": k, "answer_value": x,
                     "explanation": "Because the value is computed as seven times the slot plus three, which gives %d." % x,
@@ -287,12 +288,14 @@ class TestBuild(unittest.TestCase):
         self.assertTrue(all("TRAP" not in q["stem"] for q in paper["questions"]))
         self.assertTrue(all("answer" not in q for q in paper["questions"]))  # no key in the paper
         self.assertEqual([q["n"] for q in paper["questions"]], list(range(1, 51)))
-        for code in ("RC", "DI"):
-            g = [x for x in paper["groups"].values() if x["section"] == code]
-            self.assertEqual(len(g), 1)
-            self.assertEqual(len(g[0]["qnums"]), 4)
+        counts = {s["code"]: s["count"] for s in paper["sections"]}
+        self.assertEqual(counts, {"QA": 30, "DI": 6, "LR": 4, "DM": 5, "VA": 5})  # mostly Quant
+        self.assertEqual(paper["sections"][0]["code"], "QA")  # Quant first on the page
+        di = [x for x in paper["groups"].values() if x["section"] == "DI"]
+        self.assertEqual(sorted(len(x["qnums"]) for x in di), [3, 3])
         dm = [x for x in paper["groups"].values() if x["section"] == "DM"]
-        self.assertEqual(sorted(len(x["qnums"]) for x in dm), [3, 3])
+        self.assertEqual([len(x["qnums"]) for x in dm], [3])
+        self.assertGreaterEqual(meta["claude_calls"], 3 + 4 * 2)  # Quant went out in several setter calls
         self.assertTrue(all(k["checks"]["code"] == "pass" and k["checks"]["solver"] == "agree" for k in key["answers"].values()))
         build.publish(paper, key, meta)
         self.assertEqual(store.days(), ["2026-11-21"])
@@ -301,6 +304,69 @@ class TestBuild(unittest.TestCase):
         # the next day must not repeat today's questions: same fake stems would all be repeats
         b2 = build.Builder(cfg, "2026-11-22", call=fake_call, log=lambda m: None)
         self.assertTrue(b2.past_stems.get("QA"))
+
+
+class TestLimits(unittest.TestCase):
+    def test_limit_reset_parsing(self):
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+        tz = ZoneInfo("America/Chicago")
+        now = datetime(2026, 11, 22, 10, 53, tzinfo=tz)
+        msg = "claude error: You've hit your 5-hour limit \u00b7 resets 11:30am (America/Chicago)"
+        r = build.limit_reset(msg, now)
+        self.assertEqual(datetime.fromtimestamp(r - 90, tz).strftime("%Y-%m-%d %H:%M"), "2026-11-22 11:30")
+        later = datetime(2026, 11, 22, 23, 0, tzinfo=tz)
+        r2 = build.limit_reset(msg, later)  # already past today: tomorrow
+        self.assertEqual(datetime.fromtimestamp(r2 - 90, tz).strftime("%Y-%m-%d %H:%M"), "2026-11-23 11:30")
+        r3 = build.limit_reset("You've hit your weekly limit \u00b7 resets Mon 9am (America/Chicago)", now)
+        self.assertEqual(datetime.fromtimestamp(r3 - 90, tz).strftime("%a %H:%M"), "Mon 09:00")
+        self.assertIsNone(build.limit_reset("claude gave no JSON (exit 1): boom", now))
+        self.assertIsNotNone(build.limit_reset("usage limit reached", now))  # unreadable time: still a limit
+
+    def test_build_waits_for_the_limit_then_finishes(self):
+        import time as _t
+        cfg = store.load_config()
+        home = os.path.join(TMP, "limit")
+        os.environ["APTITUDE_HOME"] = home
+        real = build.limit_reset
+        state = {"hit": 0}
+
+        def limited(system, prompt, model, timeout, cwd):
+            if state["hit"] < 3:
+                state["hit"] += 1
+                raise RuntimeError("claude error: You've hit your 5-hour limit \u00b7 resets 11:30am (America/Chicago)")
+            return fake_call(system, prompt, model, timeout, cwd)
+
+        build.limit_reset = lambda msg, now=None: (_t.time() + 1.0) if "limit" in msg else None
+        try:
+            store.ensure_dirs()
+            logs = []
+            b = build.Builder(cfg, "2026-11-23", call=limited, log=logs.append)
+            t0 = _t.time()
+            paper, key, meta = b.run()
+            self.assertEqual(len(paper["questions"]), 50)  # nothing lost to the limit
+            self.assertGreaterEqual(_t.time() - t0, 0.9)  # it really waited
+            self.assertTrue(any("usage limit reached; waiting until" in m for m in logs))
+        finally:
+            build.limit_reset = real
+            os.environ["APTITUDE_HOME"] = TMP
+
+    def test_chunks_keep_topics_together(self):
+        sp = {"code": "QA", "n": 30, "groups": [{"key": "QA1"}],
+              "slots": [{"topic": "t%d" % (i % 10), "difficulty": "easy"} for i in range(36)]}
+        cs = build.chunks(sp, 12)
+        self.assertEqual(len(cs), 3)
+        self.assertEqual(sum(len(c["slots"]) for c in cs), 36)
+        self.assertEqual(cs[0]["groups"], [{"key": "QA1"}])
+        self.assertEqual(cs[1]["groups"], [])
+        seen = {}
+        for c in cs:
+            for s in c["slots"]:
+                seen.setdefault(s["topic"], set()).add(c["_chunk"])
+        self.assertGreaterEqual(sum(1 for v in seen.values() if len(v) == 1), 8)  # most topics stay in one call
+        small = build.chunks(dict(sp, slots=sp["slots"][:12]), 12)
+        self.assertEqual(len(small), 1)
+        self.assertEqual(small[0]["_label"], "QA")
 
 
 class TestCli(unittest.TestCase):

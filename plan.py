@@ -10,7 +10,7 @@ import math
 import random
 from datetime import date
 
-SECTION_ORDER = ["VA", "RC", "DM", "QA", "DI", "LR", "AA"]
+SECTION_ORDER = ["QA", "DI", "LR", "AA", "DM", "VA", "RC"]  # page order; Quant first
 BASE_MIX = {"easy": 0.25, "medium": 0.5, "hard": 0.25}
 HARD_MIX = {"easy": 0.1, "medium": 0.45, "hard": 0.45}
 EASY_MIX = {"easy": 0.4, "medium": 0.45, "hard": 0.15}

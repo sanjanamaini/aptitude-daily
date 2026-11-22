@@ -10,10 +10,17 @@ Then the paper (no answers) and the key are written to separate files.
 """
 import math
 import os
+import re
 import shutil
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timedelta
+
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:  # pragma: no cover
+    ZoneInfo = None
 
 import llm
 import plan as planmod
@@ -21,6 +28,52 @@ import prompts
 import score
 import store
 import verify
+
+
+LIMIT_MSG = re.compile(r"hit your .{0,40}limit|usage limit|rate limit|limit reached", re.I)
+LIMIT_RESET = re.compile(r"resets\s+(?:(mon|tue|wed|thu|fri|sat|sun)\w*\s+)?(\d{1,2})(?::(\d{2}))?\s*([ap]m)?\s*(?:\(([^)]+)\))?", re.I)
+DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+
+
+def limit_reset(msg, now=None):
+    """When a Claude reply says the usage limit is hit, the time it resets (epoch seconds, plus a
+    90 s margin). None when the message is not about a usage limit. Unreadable time: 30 minutes."""
+    if not LIMIT_MSG.search(msg or ""):
+        return None
+    now = now or datetime.now().astimezone()
+    m = LIMIT_RESET.search(msg)
+    if not m:
+        return now.timestamp() + 1800
+    dow, hh, mm, ap, tzname = m.groups()
+    h = int(hh)
+    if ap:
+        h = h % 12 + (12 if ap.lower() == "pm" else 0)
+    tz = now.tzinfo
+    if tzname and ZoneInfo is not None:
+        try:
+            tz = ZoneInfo(tzname.strip())
+        except Exception:
+            tz = now.tzinfo
+    local = now.astimezone(tz)
+    reset = local.replace(hour=h % 24, minute=int(mm or 0), second=0, microsecond=0)
+    if dow:
+        while reset.weekday() != DAYS.index(dow.lower()[:3]) or reset <= local:
+            reset += timedelta(days=1)
+    elif reset <= local:
+        reset += timedelta(days=1)
+    return reset.timestamp() + 90
+
+
+def chunks(sp, size):
+    """Split a big section into setter calls of about `size` questions. Same-topic slots stay in
+    one call (sorted by topic), so the setter keeps them different; sets go in the first call."""
+    slots = sorted(sp["slots"], key=lambda s: s["topic"])
+    if len(slots) <= size + max(2, size // 4):
+        return [dict(sp, _chunk=0, _label=sp["code"])]
+    n = int(math.ceil(len(slots) / float(size)))
+    per = int(math.ceil(len(slots) / float(n)))
+    return [dict(sp, groups=sp["groups"] if i == 0 else [], slots=slots[i * per:(i + 1) * per], _chunk=i,
+                 _label="%s%d" % (sp["code"], i + 1)) for i in range(n)]
 
 
 def stats_now(today):
@@ -41,6 +94,7 @@ class Builder:
         self.notes = []
         self.calls = 0
         self.progress = {}
+        self.limit_until = 0.0  # Claude usage limit: every call waits until this time
         bank = store.bank()
         self.bank = bank
         self.past_stems, self.past_groups = {}, []
@@ -66,9 +120,30 @@ class Builder:
                                   "stem": (q.get("stem") or "")[:160]})
 
     # ---------------------------------------------------------------- calls
+    def wait_for_limit(self):
+        while True:
+            with self.lock:
+                left = self.limit_until - time.time()
+            if left <= 0:
+                return
+            time.sleep(min(60.0, left))
+
+    def note_limit(self, reset_ts, what):
+        """Usage limit hit: everyone waits until it resets (logged once per reset time)."""
+        with self.lock:
+            new = reset_ts > self.limit_until + 30
+            self.limit_until = max(self.limit_until, reset_ts)
+        if new:
+            when = datetime.fromtimestamp(reset_ts).strftime("%H:%M")
+            self.log("%s: Claude usage limit reached; waiting until %s, then carrying on" % (what, when))
+            self.set_progress("wait", "Claude usage limit: waiting until %s" % when)
+
     def ask(self, system, prompt, model, what):
         last = ""
-        for attempt in range(2):
+        attempt, waits = 0, 0
+        max_wait = float(self.cfg["models"].get("max_limit_wait_s", 21600))
+        while attempt < 2:
+            self.wait_for_limit()
             try:
                 with self.lock:
                     self.calls += 1
@@ -76,10 +151,22 @@ class Builder:
                 text = self.call(system, prompt, model, self.cfg["models"]["timeout_s"], store.path("work"))
                 obj = llm.first_json(text, "{")
                 self.log("%s: reply in %ds" % (what, time.time() - t0))
+                with self.lock:
+                    self.progress.pop("wait", None)
                 return obj
             except Exception as e:  # noqa: BLE001
                 last = "%s: %s" % (type(e).__name__, str(e)[:200])
-                self.log("%s: attempt %d failed (%s)" % (what, attempt + 1, last))
+                reset = limit_reset(str(e))
+                if reset is not None:
+                    if reset - time.time() > max_wait or waits >= 6:
+                        self.log("%s: usage limit resets too late (%s); giving up on this call" % (
+                            what, datetime.fromtimestamp(reset).strftime("%a %H:%M")))
+                        return None
+                    waits += 1
+                    self.note_limit(reset, what)
+                    continue  # waiting for the limit is not a failed attempt
+                attempt += 1
+                self.log("%s: attempt %d failed (%s)" % (what, attempt, last))
         return None
 
     def avoid(self, code, k=25):
@@ -95,24 +182,30 @@ class Builder:
     # ---------------------------------------------------------------- one section, one round
     def section_round(self, sp, rnd, existing=None):
         code = sp["code"]
+        ci, label = sp.get("_chunk", 0), sp.get("_label", sp["code"])
         sec = self.cfg["sections"][code]
-        self.set_progress(code, "writing (round %d)" % (rnd + 1))
-        prompt, slots = prompts.section_prompt(code, sec, sp, self.avoid(code), existing, start_slot=1 + 100 * rnd)
-        reply = self.ask(prompts.SETTER, prompt, self.cfg["models"]["generate"], "%s round %d setter" % (code, rnd + 1))
+        self.set_progress(label, "writing (round %d)" % (rnd + 1))
+        prompt, slots = prompts.section_prompt(code, sec, sp, self.avoid(code), existing, start_slot=1 + 1000 * rnd + 100 * ci)
+        reply = self.ask(prompts.SETTER, prompt, self.cfg["models"]["generate"], "%s round %d setter" % (label, rnd + 1))
         if reply is None:
-            self.set_progress(code, "setter failed (round %d)" % (rnd + 1))
+            self.set_progress(label, "setter failed (round %d)" % (rnd + 1))
             return
         groups, qs = prompts.parse_setter(reply, code, sp, slots, existing)
         for q in qs:
-            q["_id"] = "%s-%d-%s" % (code, rnd, q["slot"])
-        self.set_progress(code, "checking %d questions (round %d)" % (len(qs), rnd + 1))
+            q["_id"] = "%s-%d-%d-%s" % (code, rnd, ci, q["slot"])
+        self.set_progress(label, "checking %d questions (round %d)" % (len(qs), rnd + 1))
         groups, cands = self.check(code, sec, groups, qs)
         if cands:
-            self.set_progress(code, "blind-solving %d questions (round %d)" % (len(cands), rnd + 1))
+            self.set_progress(label, "blind-solving %d questions (round %d)" % (len(cands), rnd + 1))
             self.solve(code, cands)
         with self.lock:
             have = len(self.accepted.get(code, []))
-        self.set_progress(code, "%d of %d ready" % (min(have, sp["n"]), sp["n"]))
+        self.set_progress(label, "%s: %d of %d ready" % (code, min(have, sp["n"]), sp["n"]))
+
+    def work(self, sp, existing=None):
+        """Setter calls for one section plan: big sections are split; existing sets go with the first call."""
+        size = int(self.cfg["models"].get("questions_per_call", 12))
+        return [(c, existing if c["_chunk"] == 0 else None) for c in chunks(sp, size)]
 
     def check(self, code, sec, groups, qs):
         thr = self.cfg["verify"]["dedup_threshold"]
@@ -204,9 +297,15 @@ class Builder:
             self.accept(code, q)
 
     def accept(self, code, q):
+        """Keep a question unless it repeats one already kept today (parallel calls cannot see each other)."""
+        thr = self.cfg["verify"]["dedup_threshold"]
         with self.lock:
-            self.accepted.setdefault(code, []).append(q)
-            self.today_stems.setdefault(code, []).append(verify.shingles(q["stem"]))
+            rep, sim = verify.is_repeat(q["stem"], self.today_stems.get(code, []), thr)
+            if not rep:
+                self.accepted.setdefault(code, []).append(q)
+                self.today_stems.setdefault(code, []).append(verify.shingles(q["stem"]))
+        if rep:
+            self.reject(q, "repeats another question in today's set (%d%% overlap)" % round(sim * 100), "repeat")
 
     # ---------------------------------------------------------------- top-up
     def topup(self, sp, rnd):
@@ -257,8 +356,9 @@ class Builder:
         self.plan = p
         workers = max(1, int(self.cfg["models"]["parallel_calls"]))
         self.log("plan: %s" % ", ".join("%s %d" % (s["code"], s["n"]) for s in p["sections"]))
+        first = [w for sp in p["sections"] for w in self.work(sp)]
         with ThreadPoolExecutor(max_workers=workers) as ex:
-            list(ex.map(lambda sp: self.section_round(sp, 0), p["sections"]))
+            list(ex.map(lambda w: self.section_round(w[0], 0, w[1]), first))
         rounds = 1
         for rnd in range(1, int(self.cfg["verify"]["topup_rounds"]) + 1):
             needs = [(sp, self.topup(sp, rnd)) for sp in p["sections"]]
@@ -267,8 +367,9 @@ class Builder:
                 break
             rounds += 1
             self.log("top-up round %d: %s" % (rnd, ", ".join(sp["code"] for sp, _ in needs)))
+            more = [w for sp, (tp, existing) in needs for w in self.work(tp, existing)]
             with ThreadPoolExecutor(max_workers=workers) as ex:
-                list(ex.map(lambda x: self.section_round(x[1][0], rnd, x[1][1]), needs))
+                list(ex.map(lambda w: self.section_round(w[0], rnd, w[1]), more))
         return self.assemble(p, time.time() - t0, rounds)
 
     def assemble(self, p, seconds, rounds):

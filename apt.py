@@ -20,6 +20,7 @@ all state lives in <home>/state (home from config.json, default ~/.aptitude-dail
 """
 import argparse
 import json
+import math
 import os
 import shutil
 import subprocess
@@ -110,8 +111,10 @@ def cmd_generate(a):
         secs = [s.strip().upper() for s in a.sections.split(",")] if a.sections else None
         paper, key, meta = b.run(secs)
         n = len(paper["questions"])
-        if n == 0:
-            raise RuntimeError("no question passed the checks")
+        need = int(math.ceil(float(cfg["verify"].get("min_publish_fraction", 0.9)) * meta["planned"]))
+        if n < need:
+            raise RuntimeError("only %d of %d questions passed the checks (at least %d needed); not published, the next "
+                               "scheduled try builds it again" % (n, meta["planned"], need))
         build.publish(paper, key, meta, force=a.force)
         summary = "%d questions ready (%d planned); %d drafts dropped by the checks; %d answers recomputed by code, %d confirmed by a blind solve; %d min" % (
             n, meta["planned"], meta["rejected"], meta["code_checked"], meta["solver_agreed"], meta["seconds"] // 60)
