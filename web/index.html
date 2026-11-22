@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Aptitude Daily</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/app.css">
+<script src="/app.js" defer></script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="#/today" aria-label="Aptitude Daily home">
+      <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><rect x="5" y="4" width="22" height="24" rx="4" class="sheet"/><path d="M10 11h12M10 16h12M10 21h7" class="lines"/><circle cx="23" cy="22" r="4.2" class="dot"/><path d="M21.2 22l1.3 1.3 2.4-2.6" class="tick"/></svg>
+      <span>Aptitude Daily</span>
+    </a>
+    <nav class="tabs" aria-label="Sections">
+      <a href="#/today" data-tab="today">Today</a>
+      <a href="#/sets" data-tab="sets">Sets <span class="count" id="tab-sets"></span></a>
+      <a href="#/progress" data-tab="progress">Progress</a>
+      <a href="#/mistakes" data-tab="mistakes">Mistakes <span class="count" id="tab-mistakes"></span></a>
+      <a href="#/health" data-tab="health">Health</a>
+    </nav>
+    <div class="topbar-right">
+      <button class="runpill" id="runpill" type="button" title="Build status: click for Health"><span class="pulse" aria-hidden="true"></span><span id="runtext">Loading</span></button>
+      <button class="icon-btn" id="theme-btn" type="button" aria-label="Switch light or dark theme" title="Light or dark">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path class="moon" d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main id="main" tabindex="-1">
+  <section class="view" id="view-today" aria-label="Today's set">
+    <div class="page-head">
+      <div>
+        <h1 id="day-title">Today's set</h1>
+        <p class="sub" id="day-sub"></p>
+      </div>
+      <div class="exam-chips" id="exam-chips"></div>
+    </div>
+    <div id="day-banner"></div>
+    <div id="day-body"></div>
+  </section>
+
+  <section class="view" id="view-sets" aria-label="All sets" hidden>
+    <div class="page-head"><div><h1>Sets</h1><p class="sub">Every day's 50. Unsolved sets stay open until you submit them.</p></div></div>
+    <div class="list" id="sets-list"></div>
+  </section>
+
+  <section class="view" id="view-progress" aria-label="Progress" hidden>
+    <div class="page-head"><div><h1>Progress</h1><p class="sub">Scored sets only. Tomorrow's topics lean toward the weakest ones here.</p></div></div>
+    <div id="progress-body"></div>
+  </section>
+
+  <section class="view" id="view-mistakes" aria-label="Mistakes" hidden>
+    <div class="page-head"><div><h1>Mistakes</h1><p class="sub">Every question you got wrong or skipped. Try it again before you open the answer.</p></div>
+      <div class="chips" id="mistake-filter"></div></div>
+    <div class="list" id="mistakes-list"></div>
+  </section>
+
+  <section class="view" id="view-health" aria-label="Health" hidden>
+    <div class="page-head"><div><h1>Health</h1><p class="sub">How each morning's set was built and checked.</p></div></div>
+    <div id="health-body"></div>
+  </section>
+</main>
+
+<div class="sheetbar" id="sheetbar" hidden>
+  <div class="sheetbar-inner">
+    <div class="sb-stat"><span class="num" id="sb-answered">0/50</span><span class="lbl">answered</span></div>
+    <div class="sb-stat"><span class="num" id="sb-flagged">0</span><span class="lbl">flagged</span></div>
+    <button class="timer" id="sb-timer" type="button" title="Start or pause the timer"><span class="num" id="sb-time">00:00</span><span class="lbl" id="sb-timer-lbl">start timer</span></button>
+    <div class="sb-spacer"></div>
+    <button class="btn ghost" id="sb-paper" type="button" title="You solved it on paper and only want the key">Solved on paper: show key</button>
+    <button class="btn primary" id="sb-submit" type="button">Submit and show answer key</button>
+  </div>
+</div>
+
+<div class="modal-back" id="modal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <h2 id="modal-title"></h2>
+    <p id="modal-text"></p>
+    <div class="modal-actions">
+      <button class="btn ghost" id="modal-cancel" type="button">Keep solving</button>
+      <button class="btn primary" id="modal-ok" type="button">Show the key</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+</body>
+</html>

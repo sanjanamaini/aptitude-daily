@@ -1,0 +1,391 @@
+{
+  "_about": "Daily aptitude sets for XAT and the BITS Pilani BAAT. Personal settings (state folder, launchd labels, sync folder, a ramp start date) go in config.local.json, which is git-ignored and overrides this file. After editing either, run: python3 apt.py deploy",
+  "paths": {
+    "home": "~/.aptitude-daily"
+  },
+  "sync_dir": null,
+  "launchd": {
+    "label": "local.aptitude-daily",
+    "web_label": "local.aptitude-daily.web"
+  },
+  "schedule": "06:30",
+  "web_port": 8643,
+  "questions_per_day": 50,
+  "models": {
+    "generate": "opus",
+    "solve": "opus",
+    "timeout_s": 900,
+    "parallel_calls": 4
+  },
+  "verify": {
+    "topup_rounds": 2,
+    "dedup_threshold": 0.6,
+    "group_dedup_threshold": 0.45
+  },
+  "scoring": {
+    "correct": 1.0,
+    "wrong": -0.25,
+    "skipped": 0.0,
+    "_source": "XAT marking as reported for XAT 2027 (careers360, collegedunia, checked 2026-11-21); BAAT marking is not published"
+  },
+  "minutes_per_question": 2.2,
+  "ramp": {
+    "_about": "Optional warm-up: from `start`, for `days` days, difficulty moves in a straight line from `from` to `to` (rounded across the whole day, so each day is harder than the one before), overriding the adaptive difficulty. null start = off. Set a start date in config.local.json.",
+    "start": null,
+    "days": 15,
+    "from": {
+      "easy": 0.85,
+      "medium": 0.15,
+      "hard": 0.0
+    },
+    "to": {
+      "easy": 0.1,
+      "medium": 0.45,
+      "hard": 0.45
+    }
+  },
+  "exams": [
+    {
+      "name": "XAT 2027",
+      "date": "2027-01-03",
+      "deadline": "2026-12-06",
+      "deadline_label": "registration closes",
+      "note": "Dates from news reports checked 2026-11-21; confirm on xatonline.in",
+      "url": "https://xatonline.in"
+    },
+    {
+      "name": "BITS BAAT 2027",
+      "date": null,
+      "deadline": null,
+      "note": "BITS says applications usually open in the last week of November; test date not announced (checked 2026-11-21)",
+      "url": "https://dom.bits-pilani.ac.in/admissions/baat-syllabus"
+    }
+  ],
+  "phases": [
+    {
+      "name": "xat",
+      "until": "2027-01-03",
+      "label": "XAT focus until 3 Jan 2027, BAAT alongside",
+      "mix": {
+        "QA": {
+          "n": 12
+        },
+        "DI": {
+          "n": 4,
+          "sets": [
+            4
+          ]
+        },
+        "RC": {
+          "n": 4,
+          "sets": [
+            4
+          ]
+        },
+        "VA": {
+          "n": 6
+        },
+        "LR": {
+          "n": 6,
+          "sets": [
+            3
+          ]
+        },
+        "DM": {
+          "n": 10,
+          "sets": [
+            3,
+            3
+          ]
+        },
+        "AA": {
+          "n": 8
+        }
+      }
+    },
+    {
+      "name": "baat",
+      "until": null,
+      "label": "BAAT focus",
+      "mix": {
+        "QA": {
+          "n": 14
+        },
+        "DI": {
+          "n": 6,
+          "sets": [
+            3,
+            3
+          ]
+        },
+        "RC": {
+          "n": 4,
+          "sets": [
+            4
+          ]
+        },
+        "VA": {
+          "n": 6
+        },
+        "LR": {
+          "n": 8,
+          "sets": [
+            4
+          ]
+        },
+        "AA": {
+          "n": 12
+        }
+      }
+    }
+  ],
+  "exclusive_topics": {
+    "_about": "Topics that test the same idea in two places; once one is picked for a day, the others are skipped that day",
+    "groups": [
+      [
+        [
+          "QA",
+          "set theory and Venn diagrams"
+        ],
+        [
+          "LR",
+          "Venn diagram reasoning"
+        ]
+      ],
+      [
+        [
+          "QA",
+          "probability"
+        ],
+        [
+          "AA",
+          "probability and combinations"
+        ]
+      ],
+      [
+        [
+          "QA",
+          "permutations and combinations"
+        ],
+        [
+          "AA",
+          "probability and combinations"
+        ]
+      ],
+      [
+        [
+          "QA",
+          "coordinate geometry"
+        ],
+        [
+          "AA",
+          "coordinate geometry in two dimensions"
+        ]
+      ],
+      [
+        [
+          "LR",
+          "truth-tellers and liars"
+        ],
+        [
+          "LR",
+          "binary logic (truth-tellers and liars)"
+        ]
+      ],
+      [
+        [
+          "VA",
+          "critical reasoning: inference or conclusion"
+        ],
+        [
+          "LR",
+          "syllogisms"
+        ]
+      ]
+    ]
+  },
+  "sections": {
+    "QA": {
+      "name": "Quantitative Ability",
+      "exams": [
+        "XAT",
+        "BAAT"
+      ],
+      "options": 5,
+      "code_check": "required",
+      "topics": [
+        "percentages",
+        "profit, loss and discount",
+        "ratio, proportion and mixtures",
+        "averages and alligation",
+        "simple and compound interest",
+        "time, speed and distance (including boats and trains)",
+        "time and work, pipes and cisterns",
+        "number system (divisibility, remainders, HCF and LCM, factors)",
+        "linear and quadratic equations",
+        "inequalities and modulus",
+        "progressions (AP and GP)",
+        "logarithms, surds and indices",
+        "functions and graphs",
+        "geometry (triangles, circles, polygons)",
+        "mensuration (2D and 3D)",
+        "coordinate geometry",
+        "trigonometry (heights and distances)",
+        "permutations and combinations",
+        "probability",
+        "set theory and Venn diagrams",
+        "partnership"
+      ],
+      "guide": "XAT Quantitative Ability and BAAT Quantitative Aptitude level: multi-step word problems, not one-formula drills. Hard questions combine two ideas. Use Indian settings and rupees where natural."
+    },
+    "DI": {
+      "name": "Data Interpretation",
+      "exams": [
+        "XAT",
+        "BAAT"
+      ],
+      "options": 5,
+      "code_check": "required",
+      "set_kinds": [
+        "table",
+        "bar chart",
+        "line chart",
+        "pie chart",
+        "caselet (all data given in a paragraph)",
+        "table with some values missing that must be deduced"
+      ],
+      "topics": [],
+      "guide": "Each set gives one data source (a table, a chart or a paragraph) with realistic Indian business or public data that you invent. Questions need calculation: growth rates, shares, ratios, averages, comparisons, what-if changes. Never use a real dataset or real company figures."
+    },
+    "RC": {
+      "name": "Reading Comprehension",
+      "exams": [
+        "XAT",
+        "BAAT"
+      ],
+      "options": 5,
+      "code_check": "none",
+      "set_kinds": [
+        "economics",
+        "philosophy",
+        "science and technology",
+        "history",
+        "sociology",
+        "art and literature",
+        "psychology",
+        "environment and ecology",
+        "business and management",
+        "politics and governance"
+      ],
+      "topics": [],
+      "guide": "XAT-style passage of 380-480 words, original, dense and argumentative (the author takes a position). Questions test main idea, inference, the author's assumption or attitude, application to a new case, and what would weaken the argument. Wrong options must be tempting: too broad, too extreme, true but not stated, or a reversal."
+    },
+    "VA": {
+      "name": "Verbal Ability",
+      "exams": [
+        "XAT",
+        "BAAT"
+      ],
+      "options": 5,
+      "code_check": "none",
+      "topics": [
+        "para jumble (order of 4 or 5 sentences)",
+        "odd sentence out",
+        "para summary",
+        "para completion",
+        "critical reasoning: assumption",
+        "critical reasoning: strengthen or weaken",
+        "critical reasoning: inference or conclusion",
+        "sentence correction and grammar",
+        "vocabulary in context (fill in the blank)",
+        "idioms, phrasal verbs and different usage of the same word",
+        "analogies and antonyms",
+        "verbal logic: statement and argument"
+      ],
+      "guide": "XAT Verbal and Logical Ability plus BAAT Verbal Ability. For para jumbles, label the sentences 1 to 5 in the stem and make the options sequences such as 3-1-4-2-5. For sentence correction, quote the sentence in the stem."
+    },
+    "LR": {
+      "name": "Logical Reasoning",
+      "exams": [
+        "BAAT",
+        "XAT"
+      ],
+      "options": 5,
+      "code_check": "optional",
+      "set_kinds": [
+        "linear seating arrangement",
+        "circular seating arrangement",
+        "scheduling across days of the week",
+        "grouping and selection",
+        "ranking and ordering",
+        "distribution of people, items and attributes",
+        "truth-tellers and liars"
+      ],
+      "topics": [
+        "blood relations and family tree",
+        "coding-decoding",
+        "direction sense",
+        "number and letter series",
+        "syllogisms",
+        "clocks and calendars",
+        "data sufficiency",
+        "Venn diagram reasoning",
+        "binary logic (truth-tellers and liars)",
+        "statements and assumptions",
+        "input-output and sequence of operations"
+      ],
+      "guide": "BAAT Logical Reasoning topics (puzzles, seating, blood relations, coding, syllogisms, series, clocks and calendars, data sufficiency). A set gives one puzzle with clues; it must have exactly one consistent arrangement, and every question must be answerable from the clues alone."
+    },
+    "DM": {
+      "name": "Decision Making",
+      "exams": [
+        "XAT"
+      ],
+      "options": 5,
+      "code_check": "optional",
+      "set_kinds": [
+        "ethics at work",
+        "business strategy",
+        "operations and resource allocation (with numbers)",
+        "people management and HR",
+        "stakeholder conflict",
+        "public policy and administration",
+        "customer and marketing decisions",
+        "startup or family business"
+      ],
+      "topics": [
+        "ethical dilemma",
+        "managerial judgement",
+        "conflict between rules and outcomes",
+        "prioritisation under constraints",
+        "quantitative decision (allocation, scheduling, cost-benefit)"
+      ],
+      "guide": "XAT Decision Making: a realistic Indian workplace or social situation with named people, goals and constraints. Ask what the decision-maker should do, which option best balances the stakeholders, or which action is most appropriate. The keyed option is the one a careful XLRI panel would choose: it solves the problem, respects every constraint and stakeholder, and is ethical and practical. Distractors are plausible but break a constraint, ignore a stakeholder, are extreme, or only delay the problem. Numeric caselets must have one computable answer."
+    },
+    "AA": {
+      "name": "Analytics Aptitude",
+      "exams": [
+        "BAAT"
+      ],
+      "options": 4,
+      "code_check": "optional",
+      "topics": [
+        "matrices and determinants",
+        "systems of linear equations and rank",
+        "eigenvalues of a 2x2 matrix",
+        "coordinate geometry in two dimensions",
+        "differential calculus (derivatives, maxima and minima)",
+        "integral calculus (definite integrals and area)",
+        "numerical analysis (bisection, Newton-Raphson, trapezoidal rule, errors)",
+        "probability and combinations",
+        "programming: output of a short program (Python or pseudocode)",
+        "programming: loops, recursion and time complexity",
+        "data structures: arrays and lists",
+        "data structures: stacks and queues",
+        "Boolean algebra and logic gates",
+        "number systems (binary, octal, hexadecimal)"
+      ],
+      "guide": "BITS BAAT Analytics Aptitude: basic aptitude for computers and mathematics (first-year engineering level). Programs are 4 to 10 lines; write code in the stem with real line breaks and 4-space indentation."
+    }
+  }
+}
