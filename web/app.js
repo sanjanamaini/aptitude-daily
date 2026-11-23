@@ -198,8 +198,10 @@
   }
 
   function isCodeLine(line) {
+    // case-sensitive on purpose: "Let f(x) = 2x + 3" is maths in English, "let x = 3" is code
     return /^( {2,}|\t)/.test(line) || /^(def |for |while |if |elif |else:|print\(|return |class |import |from |[A-Za-z_]\w*(\[[^\]]*\])? ?(=|\+=|-=|\*=|\/\/=) )/.test(line) ||
-      /^(BEGIN|END|SET |FOR |WHILE |IF |ELSE|PRINT|function |var |int |let )/i.test(line) && /[=(:]/.test(line);
+      (/^(BEGIN|END|SET |FOR |WHILE |IF |ELSE|PRINT)\b/.test(line) && /[=(:]/.test(line)) ||
+      /^(function |var |int |let )[A-Za-z_]\w*\s*(=|\()/.test(line);
   }
   function stemNode(text) {
     var box = h("div", { class: "stem" });

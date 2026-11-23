@@ -126,6 +126,14 @@ def main():
             except urllib.error.HTTPError as e:
                 locked = e.code
             ok(locked == 403, "key endpoint locked before submit (%s)" % locked)
+            # the phone layout while the set is still open (the answer bar is showing)
+            ph = br.new_context(viewport={"width": 390, "height": 844}, is_mobile=True).new_page()
+            ph.goto(base + "#/day/" + day)
+            ph.wait_for_selector(".q")
+            wide_open = ph.evaluate("document.documentElement.scrollWidth")
+            ok(wide_open <= 392, "no sideways scroll on a phone while solving (width %d)" % wide_open)
+            ph.screenshot(path=os.path.join(shots, "8a-phone-solving.png"))
+            ph.context.close()
             page.locator("#sb-submit").click()
             ok(page.locator("#modal").is_visible(), "submit asks to confirm")
             page.locator("#modal-ok").click()

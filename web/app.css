@@ -151,8 +151,11 @@ main { max-width: 1100px; margin: 0 auto; padding: 24px 20px; }
 .q-tools { margin-left: auto; display: flex; gap: 6px; }
 .flag-btn { border: 1px solid var(--line); background: transparent; color: var(--muted); border-radius: 8px; height: 28px; padding: 0 9px; font-size: 12.5px; cursor: pointer; }
 .flag-btn.on { color: var(--warn); border-color: var(--warn); background: var(--warn-soft); }
-.stem { white-space: pre-wrap; font-size: 15.5px; margin: 4px 0 12px; }
+.stem { white-space: pre-wrap; font-size: 15.5px; margin: 4px 0 12px; overflow-wrap: anywhere; }
 .stem.code, .stem .code { font-family: var(--mono); font-size: 13.5px; }
+/* a long code line scrolls inside its own box; it never widens the page */
+.stem pre.code { max-width: 100%; overflow-x: auto; background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; margin: 6px 0; }
+.opt .t, .explain .b, .stim .text { overflow-wrap: anywhere; }
 .opts { display: grid; gap: 7px; }
 .opt { display: flex; gap: 10px; align-items: flex-start; text-align: left; width: 100%; padding: 9px 12px; border-radius: 9px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; line-height: 1.45; }
 .opt:hover { border-color: var(--line-strong); background: var(--surface-2); }
