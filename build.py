@@ -64,6 +64,49 @@ def limit_reset(msg, now=None):
     return reset.timestamp() + 90
 
 
+LETTERS = "ABCDE"
+MOVABLE_SECTIONS = ("QA", "DI", "AA")
+LETTER_REF = re.compile(
+    r"\b(?:option|options|choice|choices|answer)\s*\(?\s*[A-E]\b|\(\s*[A-E]\s*\)|\b[A-E]\s*(?:,|and|or)\s*[A-E]\b"
+    r"|\b[A-E]\s+(?:is|are|says|gives|ignores|forgets|comes|uses|reverses|confuses|adds|treats|counts|assumes|would)\b"
+    r"|\b(?:first|second|third|fourth|fifth|last)\s+option\b")
+
+
+def movable(q):
+    """May the correct option change position without breaking anything? Only for numeric sections
+    whose explanation never names an option by letter, and whose options are not in sorted order."""
+    if q["section"] not in MOVABLE_SECTIONS:
+        return False
+    if LETTER_REF.search(" ".join([q.get("explanation") or "", q.get("shortcut") or ""])):
+        return False
+    vals = [verify.parse_number(o) for o in q["options"]]
+    if all(v is not None for v in vals) and (vals == sorted(vals) or vals == sorted(vals, reverse=True)):
+        return False
+    return True
+
+
+def rebalance(questions, rng):
+    """Spread correct answers evenly over A to E: movable questions get their correct option swapped
+    to the least-used letter so far. The check code compares option text, so it still holds."""
+    from collections import Counter
+    mov = [q for q in questions if movable(q)]
+    ids = {id(q) for q in mov}
+    counts = Counter(q["answer"] for q in questions if id(q) not in ids)
+    rng.shuffle(mov)
+    moved = 0
+    for q in mov:
+        letters = LETTERS[:len(q["options"])]
+        low = min(counts[x] for x in letters)
+        t = rng.choice([x for x in letters if counts[x] == low])
+        k, ti = LETTERS.index(q["answer"]), LETTERS.index(t)
+        if ti != k:
+            q["options"][k], q["options"][ti] = q["options"][ti], q["options"][k]
+            q["answer"] = t
+            moved += 1
+        counts[t] += 1
+    return moved
+
+
 def chunks(sp, size):
     """Split a big section into setter calls of about `size` questions. Same-topic slots stay in
     one call (sorted by topic), so the setter keeps them different; sets go in the first call."""
@@ -193,6 +236,7 @@ class Builder:
         groups, qs = prompts.parse_setter(reply, code, sp, slots, existing)
         for q in qs:
             q["_id"] = "%s-%d-%d-%s" % (code, rnd, ci, q["slot"])
+            q["_orig_answer"] = q["answer"]
         self.set_progress(label, "checking %d questions (round %d)" % (len(qs), rnd + 1))
         groups, cands = self.check(code, sec, groups, qs)
         if cands:
@@ -408,6 +452,7 @@ class Builder:
             if count:
                 sections_out.append({"code": code, "name": sec["name"], "exams": sec["exams"], "count": count,
                                      "first": first, "last": len(questions), "planned": sp["n"]})
+        moved = rebalance(questions, __import__("random").Random("balance-" + self.day))
         paper_qs = []
         for i, q in enumerate(questions, 1):
             paper_qs.append({"n": i, "section": q["section"], "group": q.get("group"), "topic": q["topic"],
@@ -433,6 +478,8 @@ class Builder:
                 "planned": sum(s["n"] for s in p["sections"]), "published": n, "code_checked": code_checked,
                 "solver_agreed": sum(1 for q in questions if q.get("_solver") == "agree"),
                 "rejected": len(self.rejected), "rejected_by_stage": by_stage, "rejections": self.rejected,
+                "answers_moved": moved, "answer_letters": {x: sum(1 for q in questions if q["answer"] == x) for x in LETTERS},
+                "setter_missed_position": sum(1 for q in questions if q.get("_target") and q.get("_orig_answer", q["answer"]) != q["_target"]),
                 "notes": self.notes, "plan": p, "models": self.cfg["models"]}
         return paper, {"day": self.day, "answers": key}, meta
 

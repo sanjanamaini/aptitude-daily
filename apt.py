@@ -11,6 +11,7 @@ unlocks only once the set is submitted (on the page, or with `submit` / `unlock`
   python3 apt.py unlock                  # solved on paper: unlock without a score
   python3 apt.py key [--wrong | --full]  # print an unlocked key
   python3 apt.py fix --q 12 --answer C --why "..."   # a key proved wrong: correct on the record, re-score
+  python3 apt.py rebalance [--day D]     # spread an unstarted set's answers evenly over A to E
   python3 apt.py brief                   # one line for a Claude Code SessionStart hook
   python3 apt.py deploy [--time 06:30]   # copy to <home>/app and install the two launchd agents (macOS)
   python3 apt.py sync [--to DIR]         # copy sets, unlocked keys and scores into a folder you keep
@@ -101,6 +102,11 @@ def cmd_generate(a):
         store.save(store.state("run.json"), {"running": False, "day": day, "ok": False, "finished": store.now(),
                                              "summary": "claude CLI not found"})
         return 1
+    if shutil.which("caffeinate"):  # keep the Mac awake while building (a sleeping Mac stalled a build for hours)
+        try:
+            subprocess.Popen(["caffeinate", "-is", "-w", str(os.getpid())], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except OSError:
+            pass
     started = store.now()
     store.save(store.state("run.json"), {"running": True, "pid": os.getpid(), "day": day, "started": started,
                                          "trigger": "schedule" if a.scheduled else ("website" if a.web else "manual"),
@@ -243,6 +249,50 @@ def cmd_key(a):
     print("")
     which = "full" if a.full else ("wrong" if a.wrong else "compact")
     print("\n".join(key_lines(day, which)))
+    return 0
+
+
+def cmd_rebalance(a):
+    """Spread an unsolved, unstarted set's correct answers evenly over the letters (no new Claude calls).
+    Only numeric questions whose explanations never name an option letter are moved; every moved
+    question's check code is run again against its new options."""
+    import random
+    import build
+    import verify
+    day = pick_day(a)
+    if store.unlocked(day):
+        print("%s is already unlocked; not changing it" % day)
+        return 2
+    if (store.draft(day) or {}).get("answers"):
+        print("%s already has answers saved; moving options now would scramble them" % day)
+        return 2
+    p, k = store.paper(day), store.key(day)
+    qs = []
+    for q in p["questions"]:
+        e = k["answers"][str(q["n"])]
+        qs.append(dict(q, options=list(q["options"]), answer=e["answer"], explanation=e["explanation"],
+                       shortcut=e.get("shortcut", ""), _check=e.get("check_code", ""), _value=e.get("answer_value")))
+    before = {x: sum(1 for q in qs if q["answer"] == x) for x in "ABCDE"}
+    moved = build.rebalance(qs, random.Random("balance-" + day))
+    for q in qs:
+        if q["_check"].strip():
+            r = verify.run_check(q["_check"])
+            ok, why = verify.compare(r.get("result"), dict(q, answer_value=q["_value"])) if r.get("ok") else (False, r.get("error"))
+            if not ok:
+                print("Q%d: check failed after the move (%s); nothing saved" % (q["n"], why))
+                return 1
+    bak = store.day_file(day, "_before-rebalance-%s" % time.strftime("%H%M%S"))
+    os.makedirs(bak)
+    for f in ("paper.json", "key.json"):
+        shutil.copyfile(store.day_file(day, f), os.path.join(bak, f))
+    for q, pq in zip(qs, p["questions"]):
+        pq["options"] = q["options"]
+        k["answers"][str(q["n"])]["answer"] = q["answer"]
+    with store.lock():
+        store.save(store.day_file(day, "key.json"), k)
+        store.save(store.day_file(day, "paper.json"), p)
+    after = {x: sum(1 for q in qs if q["answer"] == x) for x in "ABCDE"}
+    print("%s: moved %d correct options; letters before %s, after %s" % (day, moved, before, after))
     return 0
 
 
@@ -489,6 +539,8 @@ def main():
     st = sub.add_parser("status")
     st.add_argument("-n", type=int, default=10)
     sub.add_parser("brief")
+    rb = sub.add_parser("rebalance")
+    rb.add_argument("--day")
     fx = sub.add_parser("fix")
     fx.add_argument("--day")
     fx.add_argument("--q", required=True, type=int)
@@ -500,7 +552,7 @@ def main():
     y.add_argument("--to")
     a = ap.parse_args()
     fn = {"generate": cmd_generate, "submit": cmd_submit, "unlock": cmd_unlock, "key": cmd_key, "status": cmd_status,
-          "brief": cmd_brief, "deploy": cmd_deploy, "sync": cmd_sync, "fix": cmd_fix}[a.cmd]
+          "brief": cmd_brief, "deploy": cmd_deploy, "sync": cmd_sync, "fix": cmd_fix, "rebalance": cmd_rebalance}[a.cmd]
     return fn(a)
 
 

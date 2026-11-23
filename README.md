@@ -35,6 +35,10 @@ Sections and topics follow the published patterns: the [BITS BAAT syllabus](http
 
 Big sections go to Claude in calls of about 12 questions, run in parallel. Questions on the same topic go in the same call so the setter can make them test different ideas, and a final check drops any question that repeats another one kept that day.
 
+**Answer positions.** Models tend to put the right answer first, so the plan gives every question a target letter, spread evenly over A to E, and the setter must place the correct option there. As a safety net, numeric questions whose explanations never name an option by letter (and whose options are not in sorted order) have their correct option moved to even out the day; the check code compares option text, so it still holds. `apt.py rebalance` does the same for an unstarted set.
+
+**Keep awake.** While a build runs, `caffeinate` keeps the Mac from idle sleep, so calls do not stall for hours.
+
 **Usage limits.** If Claude reports that your plan's usage limit is reached, the build reads the reset time from the message, waits until just after it (up to 6 hours), and carries on where it stopped; the Health page shows the wait.
 
 The questions (`paper.json`) and the key (`key.json`) are separate files, and the website never sends the key for a day that is still locked.
@@ -102,7 +106,7 @@ The build runs at 06:30 local time, again at 09:30, 13:00 and 18:00 if the day's
 ## Tests
 
 ```
-python3 test_apt.py    # 31 tests: sandbox, number matching, planner and ramp, a full build with a fake Claude, the CLI, the website API
+python3 test_apt.py    # 34 tests: sandbox, number matching, planner and ramp, a full build with a fake Claude, the CLI, the website API
 python test_web.py     # 32 checks in a real browser on a throwaway copy of your state, with screenshots
 ```
 

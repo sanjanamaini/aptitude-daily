@@ -1,5 +1,6 @@
 """Prompts for the question setter and for the blind solver, and turning replies into questions."""
 import json
+import random
 
 from verify import clean, LETTERS
 
@@ -12,7 +13,7 @@ Rules:
 - Every question must be fully answerable from what it states. No missing data, no trick wording.
 - Plain text only. Maths uses Unicode (x², √3, π, ≤, ≥, ×, ÷) or plain forms like x^2 and sqrt(3). Never LaTeX, never dollar signs. Money in rupees (₹).
 - Never use em dashes or en dashes. Use commas, colons or hyphens.
-- Options are given without letters; the page adds them.
+- Options are given without letters; the page adds them (A is the first option in your list). Put the correct option at the position named for each slot, and write the explanation for that final order.
 - Explanations teach: step by step, plain words, every step shown, at most 150 words. Add a shortcut when a faster exam method exists, else leave it empty.
 - Check code, when the section asks for it: self-contained Python that uses only math, fractions, itertools, functools, statistics, decimal, collections, string, operator, heapq and bisect. It recomputes the answer from the givens in the question (never copy the answer) and stores it in a variable named result. result is in the same unit and form as the options: 25 for "25%", 1250 for "₹1,250", 2.5 for "2.5 lakh", or the exact option text for a non-numeric answer. For a logic puzzle, brute-force every arrangement, keep those that satisfy every clue, assert that exactly one remains, then compute result from it. For a "what does this program print" question the check code is the program itself, and it may print.
 - answer_value: the correct answer as a number (same unit as the options) when it is numeric, the exact option text when it is not.
@@ -53,15 +54,26 @@ def section_prompt(code, sec, sec_plan, avoid, existing_groups=None, start_slot=
              "CHECK CODE: " + CHECK_RULES[sec["code_check"]], ""]
     slot = start_slot
     slots = {}
+    # where each correct answer goes: an even spread over the letters (models otherwise favour A)
+    rng = random.Random("positions-%s-%d" % (code, start_slot))
+    bag = []
+
+    def position():
+        if not bag:
+            bag.extend(LETTERS[:sec["options"]])
+            rng.shuffle(bag)
+        return bag.pop()
 
     def take(k, group, topic, diffs):
         nonlocal slot
-        nums = []
+        nums, at = [], []
         for i in range(k):
-            slots[slot] = {"group": group, "topic": topic, "difficulty": diffs[i] if i < len(diffs) else "medium"}
+            p = position()
+            slots[slot] = {"group": group, "topic": topic, "difficulty": diffs[i] if i < len(diffs) else "medium", "answer_at": p}
             nums.append(str(slot))
+            at.append(p)
             slot += 1
-        return ", ".join(nums)
+        return ", ".join(nums) + " (correct options in order: %s)" % ", ".join(at)
 
     if existing_groups:
         lines.append("SETS THAT ALREADY EXIST (write new questions on them and reuse their key; leave them out of your groups list; do not repeat the questions already asked):")
@@ -84,7 +96,8 @@ def section_prompt(code, sec, sec_plan, avoid, existing_groups=None, start_slot=
         lines.append("STANDALONE QUESTIONS TO WRITE (group null):")
         for s in sec_plan["slots"]:
             n = take(1, None, s["topic"], [s["difficulty"]])
-            lines.append("- slot %s: topic \"%s\", difficulty %s" % (n, s["topic"], s["difficulty"]))
+            num, at = n.split(" (correct options in order: ")
+            lines.append("- slot %s: topic \"%s\", difficulty %s, correct option %s" % (num, s["topic"], s["difficulty"], at.rstrip(")")))
         lines.append("")
     if avoid:
         lines.append("RECENT QUESTIONS TO AVOID (write different ideas, not the same idea with new numbers):")
@@ -128,7 +141,7 @@ def parse_setter(reply, code, sec_plan, slots, existing_groups=None):
                    "answer": str(q.get("answer") or "").strip().upper()[:1],
                    "answer_value": q.get("answer_value"),
                    "explanation": clean(q.get("explanation") or ""), "shortcut": clean(q.get("shortcut") or ""),
-                   "check": q.get("check") or ""})
+                   "check": q.get("check") or "", "_target": want.get("answer_at")})
     return groups, qs
 
 

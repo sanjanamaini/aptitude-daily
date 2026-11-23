@@ -369,6 +369,44 @@ class TestLimits(unittest.TestCase):
         self.assertEqual(small[0]["_label"], "QA")
 
 
+class TestBalance(unittest.TestCase):
+    def test_prompt_spreads_answer_positions(self):
+        import prompts
+        from collections import Counter
+        cfg = store.load_config()
+        sp = {"code": "QA", "n": 10, "groups": [], "slots": [{"topic": "percentages", "difficulty": "easy"}] * 10}
+        text, slots = prompts.section_prompt("QA", cfg["sections"]["QA"], sp, [])
+        c = Counter(s["answer_at"] for s in slots.values())
+        self.assertEqual(sorted(c.values()), [2, 2, 2, 2, 2])  # 10 slots, 5 letters, 2 each
+        self.assertIn("correct option", text)
+
+    def _q(self, answer, expl="Multiply the two rates and divide by their sum to get the time.", opts=None, section="QA"):
+        return {"section": section, "options": list(opts or ["17", "3", "41", "9", "26"]), "answer": answer,
+                "explanation": expl, "shortcut": ""}
+
+    def test_rebalance_spreads_an_all_A_set(self):
+        import random
+        from collections import Counter
+        qs = [self._q("A") for _ in range(20)]
+        right = [q["options"][0] for q in qs]
+        moved = build.rebalance(qs, random.Random(1))
+        c = Counter(q["answer"] for q in qs)
+        self.assertGreaterEqual(moved, 12)
+        self.assertLessEqual(max(c.values()) - min(c.values()), 1)
+        for q, r in zip(qs, right):
+            self.assertEqual(q["options"]["ABCDE".index(q["answer"])], r)  # the correct text moved with the letter
+
+    def test_rebalance_leaves_risky_questions_alone(self):
+        import random
+        named = self._q("A", expl="Option B ignores the resale value, so A is right.")
+        sorted_opts = self._q("A", opts=["1", "2", "3", "4", "5"])
+        verbal = self._q("A", section="VA")
+        qs = [named, sorted_opts, verbal] + [self._q("A") for _ in range(5)]
+        build.rebalance(qs, random.Random(2))
+        self.assertEqual((named["answer"], sorted_opts["answer"], verbal["answer"]), ("A", "A", "A"))
+        self.assertEqual(sorted_opts["options"], ["1", "2", "3", "4", "5"])
+
+
 class TestCli(unittest.TestCase):
     def test_submit_unlock_fix_via_cli(self):
         import subprocess
